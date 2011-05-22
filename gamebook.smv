@@ -45,8 +45,8 @@
 -- page 1, then page 2, then the ending. We also have a state to
 -- represent an unfinished part of the story, but we don't use it.
 --
--- To verify the formal specifications of this this model, you can
--- open NuSMV interactively and run:
+-- To verify the assertions (in SMV terms, the specifications) of this
+-- this model, you can open NuSMV interactively and run:
 --
 --   reset; read_model -i "C:\your\path\to\gamebook.smv"; go
 --   check_ctlspec
