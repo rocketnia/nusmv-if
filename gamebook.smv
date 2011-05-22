@@ -122,7 +122,7 @@ CTLSPEC EX EX done;
 -- *next* state such that "done".
 
 
-CTLSPEC EG page != end;
+CTLSPEC EG !done;
 -- There's at least one infinite path which never reaches an ending.
 
 CTLSPEC AG EF done;
