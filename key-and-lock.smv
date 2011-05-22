@@ -1,0 +1,157 @@
+-- key-and-lock.smv
+
+-- Copyright (c) 2011 Ross Angle (rocketnia)
+--
+-- Permission is hereby granted, free of charge, to any person
+-- obtaining a copy of this software and associated documentation
+-- files (the "Software"), to deal in the Software without
+-- restriction, including without limitation the rights to use, copy,
+-- modify, merge, publish, distribute, sublicense, and/or sell copies
+-- of the Software, and to permit persons to whom the Software is
+-- furnished to do so, subject to the following conditions:
+--
+-- The above copyright notice and this permission notice shall be
+-- included in all copies or substantial portions of the Software.
+--
+-- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+-- EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+-- MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+-- NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS
+-- BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+-- ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+-- CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+-- SOFTWARE.
+
+-- This is an example NuSMV model (http://nusmv.fbk.eu/) for a
+-- hypothetical text adventure (or interactive fiction work in
+-- general) with the following map:
+--
+--  +----------+  +---------+  +---------+
+--  | entryway |--| hallway |--| kitchen |
+--  | [player] |  +---------+  |  [key]  |
+--  +----------+       |       +---------+
+--                (needs key)
+--                     |
+--             +---------------+
+--             | broom closet  |
+--             | [cleanliness] |
+--             |  [godliness]  |
+--             +---------------+
+--
+-- To verify the assertions of this this model, you can open NuSMV
+-- interactively and run:
+--
+--   reset; read_model -i "C:\your\path\to\key-and-lock.smv"; go
+--   check_ctlspec
+--
+-- The comments in gamebook.smv provide a slightly more in-depth look
+-- at what's possible with NuSMV.
+--
+-- There are some idiosyncrasies to this model:
+--
+-- The player's command each turn is represented as part of the turn's
+-- state, and its results show up in the next turn. It could make
+-- sense to leave the command itself out of the model instead, but
+-- this way makes it easy to express the player's inability to affect
+-- more than one part of the world each turn.)
+--
+-- Also, the player's command on the first turn is chosen for them.
+-- It's a special one-use "starting" command, and the point of it is
+-- to make the initial state deterministic. A proposition in CTL lets
+-- say "EX ..." and "AX ..." to reason about the possibile second-turn
+-- states, but there are no similar quantifiers for reasoning about
+-- the first-turn states, so we're making the first turn unique as a
+-- workaround.
+
+MODULE main
+DEFINE
+  godly := godliness_pos = player;
+VAR
+  command : { starting, n, s, e, w, wait, switch, get };
+  get_object : { none, key, cleanliness, godliness };
+  switch_object : { none, closet_door };
+  pos : { entryway, hallway, kitchen, broom_closet, player };
+  key_pos : { entryway, hallway, kitchen, broom_closet, player };
+  cleanliness_pos :
+    { entryway, hallway, kitchen, broom_closet, player };
+  godliness_pos :
+    { entryway, hallway, kitchen, broom_closet, player };
+  closet_locked : boolean;
+
+INIT pos = entryway;
+INIT key_pos = kitchen;
+INIT cleanliness_pos = broom_closet;
+INIT godliness_pos = broom_closet;
+INIT closet_locked;
+INIT command = starting & get_object = none & switch_object = none;
+
+INVAR command = get <-> get_object != none;
+INVAR command = switch <-> switch_object != none;
+INVAR switch_object = closet_door ->
+  pos in { hallway, broom_closet } & key_pos = player;
+INVAR get_object = key -> pos = key_pos
+INVAR get_object = cleanliness -> pos = cleanliness_pos
+INVAR get_object = godliness -> pos = godliness_pos
+
+TRANS next( command ) != starting;
+
+TRANS pos = entryway & command = n -> FALSE;
+TRANS pos = entryway & command = s -> FALSE;
+TRANS pos = entryway & command = e -> next( pos ) = hallway;
+TRANS pos = entryway & command = w -> FALSE;
+
+TRANS pos = hallway & command = n -> FALSE;
+TRANS pos = hallway & command = s ->
+  next( pos ) = broom_closet & !closet_locked;
+TRANS pos = hallway & command = e -> next( pos ) = kitchen;
+TRANS pos = hallway & command = w -> next( pos ) = entryway;
+
+TRANS pos = kitchen & command = n -> FALSE;
+TRANS pos = kitchen & command = s -> FALSE;
+TRANS pos = kitchen & command = e -> FALSE;
+TRANS pos = kitchen & command = w -> next( pos ) = hallway;
+
+TRANS pos = broom_closet & command = n ->
+  next( pos ) = hallway & !closet_locked;
+TRANS pos = broom_closet & command = s -> FALSE;
+TRANS pos = broom_closet & command = e -> FALSE;
+TRANS pos = broom_closet & command = w -> FALSE;
+
+TRANS command in { n, s, e, w } | next( pos ) = pos;
+
+TRANS next( closet_locked ) =
+  (closet_locked xor switch_object = closet_door);
+
+TRANS next( key_pos ) = (key = get_object ? player : key_pos);
+TRANS next( cleanliness_pos ) =
+  (cleanliness = get_object ? player : cleanliness_pos);
+TRANS next( godliness_pos ) =
+  (godliness = get_object ? player : godliness_pos);
+
+
+CTLSPEC !EX EX EX EX EX EX AX godly;
+-- It's not possible to have godliness just after six commands.
+
+CTLSPEC EX EX EX EX EX EX EX AX godly;
+-- It's possible to have godliness just after seven commands. (The
+-- final AX is so that the test is made during the aftermath of the
+-- last command, not during the moment the command exists. It could be
+-- an EX too, but this is stronger.)
+
+CTLSPEC !EF pos = player;
+-- Even though in the model we allow the player to be in their own
+-- inventory, that state is never reachable.
+
+CTLSPEC AG key_pos in { kitchen, player };
+CTLSPEC AG cleanliness_pos in { broom_closet, player };
+CTLSPEC AG godliness_pos in { broom_closet, player };
+-- Even though in the model we allow items to be in places other than
+-- their starting points and the player's inventory, those states are
+-- never reachable.
+
+CTLSPEC !EX EX EX EX EX EX EX EX EX EX AX (
+    godly & cleanliness_pos = player & closet_locked & pos = entryway);
+CTLSPEC EX EX EX EX EX EX EX EX EX EX EX AX (
+    godly & cleanliness_pos = player & closet_locked & pos = entryway);
+-- It's possible to get to this particular position just after eleven
+-- commands, but not just after ten.
