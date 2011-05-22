@@ -105,31 +105,32 @@ CTLSPEC AG page != unwritten;
 -- (globally - G) be true that "page != unwritten".
 
 
-CTLSPEC !EX page = end;
+CTLSPEC !EX done;
 -- There is no one-page path to an ending.
 --
 -- Technically: It is not (!) true that there exists (E) a possibility
--- for the next (X) state that satisfies "page = end". (These
--- statements are always expressed in the context of the initial
--- state, so the next state here is the second one.)
+-- for the next (X) state that satisfies "done". (These statements are
+-- always expressed in the context of the initial state, so the next
+-- state here is the second one. Also, "done" is a shortcut we've
+-- defined to mean "page = end".)
 
 
-CTLSPEC EX EX page = end;
+CTLSPEC EX EX done;
 -- There is a two-pages-or-less path to an ending.
 --
 -- Technically: There exists a next state such that there exists a
--- *next* state such that "page = end".
+-- *next* state such that "done".
 
 
 CTLSPEC EG page != end;
 -- There's at least one infinite path which never reaches an ending.
 
-CTLSPEC AG EF page = end;
+CTLSPEC AG EF done;
 -- It's always possible to reach an ending.
 --
 -- Technically: It will henceforth always be true (AG) that there
 -- exists (E) a possibility that some time in the future (F) it will
--- be true that "page = end".
+-- be true that "done".
 
 CTLSPEC EF EG page in { 5, 7 };
 -- It's possible to reach pages 5 and 7 and stay wandering there
@@ -140,13 +141,11 @@ CTLSPEC AG AF page in { end, 5 };
 -- Every reachable state will inevitably reach an ending or page 5.
 
 
-CTLSPEC
-    AG (page in { 5, 7 } ->
-        AG (!(page in { 5, 7 }) -> AF page = end));
+CTLSPEC AG (page in { 5, 7 } -> AG (!(page in { 5, 7 }) -> AF done));
 -- Every departure from the page 5 - page 7 microcosm will
 -- inevitably reach an ending.
 --
 -- Technically: No matter what (A), henceforth (G), if it's ever true
 -- that "page in { 5, 7 }", then (->) no matter what (A),
 -- thenceforth (G), if ever "!(page in { 5, 7 })", then (->)
--- inevitably (A) at some point (F) it'll be true that "page = end".
+-- inevitably (A) at some point (F) it'll be true that "done".
