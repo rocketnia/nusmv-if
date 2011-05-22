@@ -1,0 +1,131 @@
+-- gamebook.smv
+-- Copyright (c) 2011 Ross Angle (rocketnia)
+
+-- This is an example NuSMV model (http://nusmv.fbk.eu/) for a
+-- hypothetical gamebook with the following structure, where page 1 is
+-- the first page and pages are connected by the following
+-- transitions:
+--
+--  *1 ------ 2*
+--   |\      /
+--   | \    6
+--   |  \  /|\
+--   |   3 -+- 5 - 8*
+--    |     |  |
+--     \   /   |
+--       4 --- 7 - 9*
+--
+-- These transitions lead from left to right, except for the vertical
+-- path between pages 5 and 7 which leads both ways. Pages 2, 8, and 9
+-- are endings.
+--
+-- In this model, we have one state for each path and one state
+-- representing an ending. Thus the shortest path to the ending is
+-- page 1, then page 2, then the ending. We also have a state to
+-- represent an unfinished part of the story, but we don't use it.
+--
+-- To verify the formal specifications of this this model, you can
+-- open NuSMV interactively and run:
+--
+--   reset; read_model -i "C:\your\path\to\gamebook.smv"; go
+--   check_ctlspec
+--
+-- You can also check CTL (computation tree logic) specifications
+-- interactively:
+--
+--   check_ctlspec -p "any of the CTL expressions below"
+--
+-- Further, NuSMV supports many temporal logic variants besides CTL.
+--
+-- For CTL, if you check a false specification, NuSMV will provide a
+-- counterexample. This makes it easy to search for diabolical paths
+-- through the gamebook, like paths shorter than a certain distance or
+-- infinite loops. Just negate the CTLSPEC expressions given below to
+-- see some of these paths.
+--
+-- Counterexamples only help for universal statements, which can be
+-- disproven by example. For false existential statements like
+-- "EF page = unwritten", the counterexample given will be a zero-step
+-- execution sequences, which isn't especially informative, but hey,
+-- at least that provides a base case for other kinds of
+-- universal-existential combinations.
+
+
+MODULE main
+DEFINE
+  unwritten := -1;
+  end := 0;
+  done := page = end;
+VAR
+  page : -1..10;
+ASSIGN
+  init( page ) := 1;
+  next( page ) := case
+    page = 1: { 2, 3, 4 };
+      page = 2: end;
+      page = 3: { 5, 6 };
+        page = 5: { 7, 8 };
+          page = 8: end;
+        page = 6: { 2, 5 };
+      page = 4: { 6, 7 };
+        page = 7: { 5, 9 };
+          page = 9: end;
+
+    page = end: end;
+    TRUE: unwritten;
+  esac;
+
+
+CTLSPEC AG page != unwritten;
+-- It's impossible to escape the model. (Every reachable page has been
+-- fully specified.)
+--
+-- Technically: For all (A) possibilities, it will forever
+-- (globally - G) be true that "page != unwritten".
+
+
+CTLSPEC !EX page = end;
+-- There is no one-page path to an ending.
+--
+-- Technically: It is not (!) true that there exists (E) a possibility
+-- for the next (X) state that satisfies "page = end". (These
+-- statements are always expressed in the context of the initial
+-- state, so the next state here is the second one.)
+
+
+CTLSPEC EX EX page = end;
+-- There is a two-pages-or-less path to an ending.
+--
+-- Technically: There exists a next state such that there exists a
+-- *next* state such that "page = end".
+
+
+CTLSPEC EG page != end;
+-- There's at least one infinite path which never reaches an ending.
+
+CTLSPEC AG EF page = end;
+-- It's always possible to reach an ending.
+--
+-- Technically: It will henceforth always be true (AG) that there
+-- exists (E) a possibility that some time in the future (F) it will
+-- be true that "page = end".
+
+CTLSPEC EF EG page in { 5, 7 };
+-- It's possible to reach pages 5 and 7 and stay wandering there
+-- forever.
+
+
+CTLSPEC AG AF page in { end, 5 };
+-- Every reachable state will inevitably reach an ending or page 5.
+
+
+CTLSPEC
+    AG (page in { 5, 7 } ->
+        AG (!(page in { 5, 7 }) -> AF page = end));
+-- Every departure from the page 5 - page 7 microcosm will
+-- inevitably reach an ending.
+--
+-- Technically: No matter what (A), henceforth (G), if it's ever true
+-- that "page in { 5, 7 }", then (->) no matter what (A),
+-- thenceforth (G), if ever "!(page in { 5, 7 })", then (->)
+-- inevitably (A) at some point (F) it'll be true that "page = end".
